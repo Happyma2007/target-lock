@@ -51,3 +51,4 @@ def test_random_trajectory_holds_sample_between_updates() -> None:
     assert not np.allclose(first, third)
     assert first[0] != 0.0
     assert first[1] != 0.0
+    assert np.linalg.norm(first[:2]) <= 0.3 + 1e-6
