@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from target_lock.cli.square_pid import _square_trajectory_action
+from target_lock.commands.app import _square_trajectory_action
 
 
 def test_square_trajectory_cycles_four_edges() -> None:
