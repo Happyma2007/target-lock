@@ -133,7 +133,7 @@ def move_open_loop(
     plane_threshold: Annotated[float, typer.Option(help="Image plane alignment threshold.")] = 0.01,
     yaw_step_rad: YawStepOption = 0.08,
     pitch_step_rad: PitchStepOption = 0.08,
-    move_speed: Annotated[float, typer.Option(help="Maximum random planar speed magnitude.")] = 0.012,
+    move_speed: Annotated[float, typer.Option(help="Maximum random planar speed magnitude.")] = 0.02,
     base_rot_scale: Annotated[float, typer.Option(help="Maximum random base rotation magnitude.")] = 0.025,
     hold_steps: Annotated[int, typer.Option(help="Steps to hold each random movement sample.")] = 120,
     seed: Annotated[int, typer.Option(help="Random seed for movement sampling.")] = 0,
@@ -212,12 +212,11 @@ def _random_trajectory_action(
     base_rot_scale: float,
 ) -> np.ndarray:
     if step_idx % max(hold_steps, 1) == 0:
-        angle = float(rng.uniform(0.0, 2.0 * np.pi))
-        speed = float(rng.uniform(0.0, move_speed))
+        min_axis_speed = 0.35 * move_speed
         current_motion = np.array(
             [
-                speed * np.cos(angle),
-                speed * np.sin(angle),
+                rng.choice((-1.0, 1.0)) * rng.uniform(min_axis_speed, move_speed),
+                rng.choice((-1.0, 1.0)) * rng.uniform(min_axis_speed, move_speed),
                 rng.uniform(-base_rot_scale, base_rot_scale),
             ],
             dtype=np.float32,
