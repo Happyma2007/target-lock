@@ -39,6 +39,21 @@ target-lock-move --server-addr 127.0.0.1:50051
 target-lock-square-pid --server-addr 127.0.0.1:50051
 ```
 
+Model path configuration can come from CLI options, environment variables, or a `.env` file.
+CLI options have the highest priority.
+
+```powershell
+$env:TARGET_LOCK_AUTOAIM_REPO="D:\academic\python\autoaim"
+$env:TARGET_LOCK_ONNX_PATH="D:\academic\python\autoaim\yolo\point_yolo_v8.onnx"
+```
+
+You can also create a project-local `.env` file:
+
+```env
+TARGET_LOCK_AUTOAIM_REPO=D:\academic\python\autoaim
+TARGET_LOCK_ONNX_PATH=D:\academic\python\autoaim\yolo\point_yolo_v8.onnx
+```
+
 The `lockon` environment expects a 6-element action vector:
 
 ```text

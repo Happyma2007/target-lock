@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Protocol
 
@@ -11,6 +12,8 @@ import numpy as np
 DEFAULT_AUTOAIM_REPO = Path(r"D:\academic\python\autoaim")
 DEFAULT_AUTOAIM_MODEL = Path("yolo") / "point_yolo_v8.onnx"
 LEGACY_AUTOAIM_MODEL = Path("point_yolo.onnx")
+AUTOAIM_REPO_ENV_VARS = ("TARGET_LOCK_AUTOAIM_REPO", "AUTOAIM_REPO")
+AUTOAIM_ONNX_ENV_VARS = ("TARGET_LOCK_ONNX_PATH", "ONNX_PATH")
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,14 +33,77 @@ class BullseyeDetector(Protocol):
         ...
 
 
-def resolve_autoaim_onnx_path(autoaim_repo: str | Path, onnx_path: str | Path | None = None) -> Path:
+def _find_project_dotenv() -> Path | None:
+    cwd = Path.cwd().resolve()
+    for directory in (cwd, *cwd.parents):
+        dotenv_path = directory / ".env"
+        if dotenv_path.is_file():
+            return dotenv_path
+    return None
+
+
+def _read_dotenv_values() -> dict[str, str]:
+    dotenv_path = _find_project_dotenv()
+    if dotenv_path is None:
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        values[key] = value
+
+    return values
+
+
+def _get_env_path(env_names: tuple[str, ...]) -> str | None:
+    for env_name in env_names:
+        value = os.getenv(env_name)
+        if value:
+            return value
+
+    dotenv_values = _read_dotenv_values()
+    for env_name in env_names:
+        value = dotenv_values.get(env_name)
+        if value:
+            return value
+    return None
+
+
+def resolve_autoaim_repo(autoaim_repo: str | Path | None = None) -> Path:
+    if autoaim_repo is not None:
+        return Path(autoaim_repo).expanduser()
+
+    configured_repo = _get_env_path(AUTOAIM_REPO_ENV_VARS)
+    if configured_repo is not None:
+        return Path(configured_repo).expanduser()
+
+    return DEFAULT_AUTOAIM_REPO.expanduser()
+
+
+def resolve_autoaim_onnx_path(autoaim_repo: str | Path | None, onnx_path: str | Path | None = None) -> Path:
+    if onnx_path is None:
+        configured_onnx_path = _get_env_path(AUTOAIM_ONNX_ENV_VARS)
+        if configured_onnx_path is not None:
+            onnx_path = configured_onnx_path
+
     if onnx_path is not None:
         resolved = Path(onnx_path).expanduser()
         if resolved.exists():
             return resolved
         raise FileNotFoundError(f"YOLO onnx model not found: {resolved}")
 
-    repo_path = Path(autoaim_repo).expanduser()
+    repo_path = resolve_autoaim_repo(autoaim_repo)
     candidates = [
         repo_path / DEFAULT_AUTOAIM_MODEL,
         repo_path / LEGACY_AUTOAIM_MODEL,
@@ -131,7 +197,7 @@ class YoloBullseyeDetector:
     def __init__(
         self,
         *,
-        autoaim_repo: str | Path = DEFAULT_AUTOAIM_REPO,
+        autoaim_repo: str | Path | None = None,
         onnx_path: str | Path | None = None,
         img_size_fallback: int = 640,
         score_threshold: float = 0.0,
