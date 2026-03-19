@@ -49,7 +49,7 @@ PitchStepOption = Annotated[
 ]
 FireOption = Annotated[
     bool,
-    typer.Option("--fire/--no-fire", help="Fire whenever the target becomes aligned."),
+    typer.Option("--fire/--no-fire", help="Fire continuously while the target remains aligned."),
 ]
 BullseyeSourceOption = Annotated[
     BullseyeSource,
