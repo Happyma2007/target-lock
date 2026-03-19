@@ -108,7 +108,7 @@ def _build_bullseye_detector(
     img_size_fallback: int,
     score_threshold: float,
 ):
-    if bullseye_source == "oracle":
+    if bullseye_source == BullseyeSource.ORACLE:
         return None
     return YoloBullseyeDetector(
         autoaim_repo=autoaim_repo,
@@ -125,7 +125,7 @@ def static_open_loop(
     align_threshold_deg: AlignThresholdOption = 0.25,
     yaw_step_rad: YawStepOption = 0.08,
     pitch_step_rad: PitchStepOption = 0.08,
-    bullseye_source: BullseyeSourceOption = "vision",
+    bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
     autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
     onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,
@@ -185,7 +185,7 @@ def move_open_loop(
     pid_deadband: Annotated[float, typer.Option(help="PID deadband threshold.")] = 0.001,
     integral_limit: Annotated[float, typer.Option(help="Integral clamp limit.")] = 0.25,
     feedback_limit: Annotated[float, typer.Option(help="Feedback clamp limit.")] = 0.65,
-    bullseye_source: BullseyeSourceOption = "vision",
+    bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
     autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
     onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,
@@ -330,7 +330,7 @@ def square_pid(
     pid_deadband: Annotated[float, typer.Option(help="PID deadband threshold.")] = 0.002,
     integral_limit: Annotated[float, typer.Option(help="Integral clamp limit.")] = 0.4,
     feedback_limit: Annotated[float, typer.Option(help="Feedback clamp limit.")] = 0.7,
-    bullseye_source: BullseyeSourceOption = "vision",
+    bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
     autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
     onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,

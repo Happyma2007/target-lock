@@ -3,7 +3,8 @@ from __future__ import annotations
 import itertools
 import time
 from dataclasses import dataclass
-from typing import Callable, Literal
+from enum import Enum
+from typing import Callable
 
 import numpy as np
 
@@ -18,7 +19,11 @@ SCHEMATIC_TARGET_X = 0.5
 SCHEMATIC_TARGET_Y = 0.0
 SCHEMATIC_WORLD_X = (-1.0, 0.7)
 SCHEMATIC_WORLD_Y = (-1.0, 1.0)
-BullseyeSource = Literal["oracle", "vision"]
+
+
+class BullseyeSource(str, Enum):
+    ORACLE = "oracle"
+    VISION = "vision"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +63,7 @@ def run_session(
     threshold: AlignmentThreshold,
     fire_when_aligned: bool,
     action_mutator: Callable[[int, np.ndarray], np.ndarray] | None = None,
-    bullseye_source: BullseyeSource = "oracle",
+    bullseye_source: BullseyeSource = BullseyeSource.ORACLE,
     bullseye_detector: BullseyeDetector | None = None,
 ) -> dict[str, object]:
     import cv2
@@ -150,11 +155,11 @@ def _resolve_tracking_info(
     if isinstance(bullseye_pixel, list) and len(bullseye_pixel) == 2:
         resolved["oracle_bullseye_pixel"] = [float(bullseye_pixel[0]), float(bullseye_pixel[1])]
 
-    if bullseye_source == "oracle":
-        resolved["bullseye_source"] = "oracle"
+    if bullseye_source == BullseyeSource.ORACLE:
+        resolved["bullseye_source"] = BullseyeSource.ORACLE.value
         return resolved
 
-    resolved["bullseye_source"] = "vision"
+    resolved["bullseye_source"] = BullseyeSource.VISION.value
     resolved.pop("bullseye_pixel", None)
     resolved.pop("vision_bullseye_score", None)
     resolved.pop("vision_bullseye_norm", None)
