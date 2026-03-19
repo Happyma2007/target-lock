@@ -5,7 +5,6 @@ from typing import Annotated
 import numpy as np
 import typer
 
-from target_lock.cli.common import AlignmentThreshold, BullseyeSource, run_session
 from target_lock.controllers import (
     ActionLayout,
     OpenLoopAimConfig,
@@ -13,7 +12,8 @@ from target_lock.controllers import (
     PidAimConfig,
     PidAimController,
 )
-from target_lock.vision import DEFAULT_AUTOAIM_REPO, YoloBullseyeDetector
+from target_lock.runtime import AlignmentThreshold, BullseyeSource, run_session
+from target_lock.vision import YoloBullseyeDetector
 
 
 app = typer.Typer(
@@ -49,7 +49,7 @@ PitchStepOption = Annotated[
 ]
 FireOption = Annotated[
     bool,
-    typer.Option("--fire/--no-fire", help="Fire whenever the target becomes aligned."),
+    typer.Option("--fire/--no-fire", help="Fire continuously while the target remains aligned."),
 ]
 BullseyeSourceOption = Annotated[
     BullseyeSource,
@@ -59,6 +59,19 @@ BullseyeSourceOption = Annotated[
 
 def _build_action_layout() -> ActionLayout:
     return ActionLayout(size=6, yaw_index=3, pitch_index=4, fire_index=5)
+
+
+def _build_alignment_threshold(
+    *,
+    align_threshold_deg: float,
+    plane_threshold: float | None = None,
+) -> AlignmentThreshold:
+    return AlignmentThreshold(
+        azimuth_deg=align_threshold_deg,
+        elevation_deg=align_threshold_deg,
+        plane_x=plane_threshold,
+        plane_y=plane_threshold,
+    )
 
 
 def _build_pid_controller(
@@ -103,7 +116,7 @@ def _build_pid_controller(
 def _build_bullseye_detector(
     *,
     bullseye_source: BullseyeSource,
-    autoaim_repo: str,
+    autoaim_repo: str | None,
     onnx_path: str | None,
     img_size_fallback: int,
     score_threshold: float,
@@ -119,15 +132,15 @@ def _build_bullseye_detector(
 
 
 @app.command("static")
-def static_open_loop(
+def static_demo(
     server_addr: ServerAddrOption = "127.0.0.1:50051",
     max_steps: MaxStepsOption = 1000,
     align_threshold_deg: AlignThresholdOption = 0.25,
     yaw_step_rad: YawStepOption = 0.08,
     pitch_step_rad: PitchStepOption = 0.08,
     bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
-    autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
-    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
+    autoaim_repo: Annotated[str | None, typer.Option(help="Path to the autoaim repository containing the YOLO model. Defaults to TARGET_LOCK_AUTOAIM_REPO or AUTOAIM_REPO.")] = None,
+    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model. Defaults to TARGET_LOCK_ONNX_PATH or ONNX_PATH.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,
     vision_score_threshold: Annotated[float, typer.Option(help="Ignore YOLO predictions below this confidence score.")] = 0.0,
     fire_when_aligned: FireOption = True,
@@ -152,10 +165,7 @@ def static_open_loop(
         controller=controller,
         action_layout=action_layout,
         max_steps=max_steps,
-        threshold=AlignmentThreshold(
-            azimuth_deg=align_threshold_deg,
-            elevation_deg=align_threshold_deg,
-        ),
+        threshold=_build_alignment_threshold(align_threshold_deg=align_threshold_deg),
         fire_when_aligned=fire_when_aligned,
         bullseye_source=bullseye_source,
         bullseye_detector=bullseye_detector,
@@ -163,7 +173,7 @@ def static_open_loop(
 
 
 @app.command("move")
-def move_open_loop(
+def move_pid(
     server_addr: ServerAddrOption = "127.0.0.1:50051",
     max_steps: MoveMaxStepsOption = None,
     align_threshold_deg: AlignThresholdOption = 0.18,
@@ -186,8 +196,8 @@ def move_open_loop(
     integral_limit: Annotated[float, typer.Option(help="Integral clamp limit.")] = 0.25,
     feedback_limit: Annotated[float, typer.Option(help="Feedback clamp limit.")] = 0.65,
     bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
-    autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
-    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
+    autoaim_repo: Annotated[str | None, typer.Option(help="Path to the autoaim repository containing the YOLO model. Defaults to TARGET_LOCK_AUTOAIM_REPO or AUTOAIM_REPO.")] = None,
+    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model. Defaults to TARGET_LOCK_ONNX_PATH or ONNX_PATH.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,
     vision_score_threshold: Annotated[float, typer.Option(help="Ignore YOLO predictions below this confidence score.")] = 0.0,
     fire_when_aligned: FireOption = True,
@@ -240,11 +250,9 @@ def move_open_loop(
         controller=controller,
         action_layout=action_layout,
         max_steps=max_steps,
-        threshold=AlignmentThreshold(
-            azimuth_deg=align_threshold_deg,
-            elevation_deg=align_threshold_deg,
-            plane_x=plane_threshold,
-            plane_y=plane_threshold,
+        threshold=_build_alignment_threshold(
+            align_threshold_deg=align_threshold_deg,
+            plane_threshold=plane_threshold,
         ),
         fire_when_aligned=fire_when_aligned,
         action_mutator=action_mutator,
@@ -331,8 +339,8 @@ def square_pid(
     integral_limit: Annotated[float, typer.Option(help="Integral clamp limit.")] = 0.4,
     feedback_limit: Annotated[float, typer.Option(help="Feedback clamp limit.")] = 0.7,
     bullseye_source: BullseyeSourceOption = BullseyeSource.VISION,
-    autoaim_repo: Annotated[str, typer.Option(help="Path to the autoaim repository containing the YOLO model.")] = str(DEFAULT_AUTOAIM_REPO),
-    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model.")] = None,
+    autoaim_repo: Annotated[str | None, typer.Option(help="Path to the autoaim repository containing the YOLO model. Defaults to TARGET_LOCK_AUTOAIM_REPO or AUTOAIM_REPO.")] = None,
+    onnx_path: Annotated[str | None, typer.Option(help="Explicit path to the YOLO onnx model. Defaults to TARGET_LOCK_ONNX_PATH or ONNX_PATH.")] = None,
     img_size_fallback: Annotated[int, typer.Option(help="Fallback square input size when the model input shape is dynamic.")] = 640,
     vision_score_threshold: Annotated[float, typer.Option(help="Ignore YOLO predictions below this confidence score.")] = 0.0,
     fire_when_aligned: FireOption = True,
@@ -384,17 +392,23 @@ def square_pid(
         controller=controller,
         action_layout=action_layout,
         max_steps=max_steps,
-        threshold=AlignmentThreshold(
-            azimuth_deg=align_threshold_deg,
-            elevation_deg=align_threshold_deg,
-            plane_x=plane_threshold,
-            plane_y=plane_threshold,
+        threshold=_build_alignment_threshold(
+            align_threshold_deg=align_threshold_deg,
+            plane_threshold=plane_threshold,
         ),
         fire_when_aligned=fire_when_aligned,
         action_mutator=action_mutator,
         bullseye_source=bullseye_source,
         bullseye_detector=bullseye_detector,
     )
+
+
+def legacy_static_main() -> None:
+    app(prog_name="target-lock-static", args=["static"])
+
+
+def legacy_square_pid_main() -> None:
+    app(prog_name="target-lock-square-pid", args=["square-pid"])
 
 
 def main() -> None:

@@ -10,7 +10,7 @@ import numpy as np
 
 from target_lock.controllers import ActionLayout, AimController
 from target_lock.sim import LockonSession
-from target_lock.vision import BullseyeDetector, BullseyeDetection
+from target_lock.vision import BullseyeDetection, BullseyeDetector
 
 
 CONTROL_DT = 0.01
@@ -70,8 +70,6 @@ def run_session(
 
     last_info: dict[str, object] = {}
     last_metrics: dict[str, float] | None = None
-    aligned_last_step = False
-
     with LockonSession(server_addr=server_addr) as session:
         frame_rgb = session.reset()
         cv2.namedWindow("target-lock", cv2.WINDOW_NORMAL)
@@ -108,10 +106,7 @@ def run_session(
                 should_fire = False
                 if last_metrics is not None:
                     aligned = _is_aligned(last_metrics, threshold)
-                    should_fire = fire_when_aligned and aligned and not aligned_last_step
-                    aligned_last_step = aligned
-                else:
-                    aligned_last_step = False
+                    should_fire = fire_when_aligned and aligned
 
                 if should_fire and action_layout.fire_index is not None:
                     fire_action = action.copy()
