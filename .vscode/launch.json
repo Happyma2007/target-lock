@@ -11,7 +11,6 @@
             "program": "src/target_lock/commands/app.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env",
-            "args": ["move"]
         },
         {
             "name": "Python 调试程序: 当前文件",

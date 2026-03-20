@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import numpy as np
 
-from target_lock.vision import DEFAULT_AUTOAIM_MODEL, resolve_autoaim_onnx_path
+from target_lock.vision import DEFAULT_AUTOAIM_MODEL, OracleBullseyeVision, resolve_autoaim_onnx_path
 
 
 def _create_model_file(repo_dir: Path) -> Path:
@@ -94,3 +95,22 @@ def test_resolve_autoaim_onnx_path_prefers_environment_over_dotenv(
     resolved = resolve_autoaim_onnx_path(None, None)
 
     assert resolved == expected_model
+
+
+def test_oracle_bullseye_vision_reads_detection_from_info() -> None:
+    detector = OracleBullseyeVision()
+
+    detection = detector.detect(
+        np.zeros((480, 640, 3), dtype=np.uint8),
+        info={
+            "bullseye_pixel": [320, 120],
+            "width": 640,
+            "height": 480,
+        },
+    )
+
+    assert detection is not None
+    assert detection.to_pixel_list() == [320.0, 120.0]
+    assert detection.score == 1.0
+    assert detection.x_norm == 0.5
+    assert detection.y_norm == 0.25

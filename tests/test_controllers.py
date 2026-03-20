@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import numpy as np
-
 from target_lock.controllers import ActionLayout, OpenLoopAimConfig, OpenLoopAimController, PidAimConfig, PidAimController
-from target_lock.runtime import BullseyeSource, _clear_aim_action, _resolve_tracking_info
-from target_lock.vision import BullseyeDetection
 
 
 def _info() -> dict[str, object]:
@@ -46,16 +42,6 @@ def test_pid_controller_resets_when_target_missing() -> None:
     assert controller.yaw_pid.initialized is False
 
 
-def test_clear_aim_action_preserves_non_aim_axes() -> None:
-    layout = ActionLayout(size=6, yaw_index=3, pitch_index=4, fire_index=5)
-    action = np.array([0.2, -0.3, 0.4, 0.9, -0.8, 1.0], dtype=np.float32)
-
-    cleared = _clear_aim_action(action.copy(), layout)
-
-    assert np.allclose(cleared[:3], np.array([0.2, -0.3, 0.4], dtype=np.float32))
-    assert np.allclose(cleared[3:], np.zeros(3, dtype=np.float32))
-
-
 def test_pid_scan_reverses_at_yaw_limits() -> None:
     layout = ActionLayout(size=6, yaw_index=3, pitch_index=4, fire_index=5)
     controller = PidAimController(
@@ -86,46 +72,3 @@ def test_pid_controller_hands_off_from_scan_to_tracking() -> None:
     assert "plane_x" in track_metrics.as_dict()
     assert track_action[3] < 0.0
     assert track_action[3] != scan_action[3]
-
-
-def test_resolve_tracking_info_replaces_oracle_with_vision_detection() -> None:
-    class FakeDetector:
-        def detect(self, frame_rgb: np.ndarray) -> BullseyeDetection | None:
-            return BullseyeDetection(pixel_x=123.5, pixel_y=45.25, score=0.9, x_norm=0.2, y_norm=0.3)
-
-    resolved = _resolve_tracking_info(
-        {
-            "bullseye_pixel": [480, 120],
-            "camera_fovy_deg": 60.0,
-            "camera_fovx_deg": 80.0,
-        },
-        np.zeros((480, 640, 3), dtype=np.uint8),
-        bullseye_source=BullseyeSource.VISION,
-        bullseye_detector=FakeDetector(),
-    )
-
-    assert resolved["bullseye_source"] == "vision"
-    assert resolved["oracle_bullseye_pixel"] == [480.0, 120.0]
-    assert resolved["bullseye_pixel"] == [123.5, 45.25]
-    assert resolved["vision_bullseye_score"] == 0.9
-
-
-def test_resolve_tracking_info_does_not_fallback_to_oracle_when_vision_misses() -> None:
-    class FakeDetector:
-        def detect(self, frame_rgb: np.ndarray) -> BullseyeDetection | None:
-            return None
-
-    resolved = _resolve_tracking_info(
-        {
-            "bullseye_pixel": [480, 120],
-            "camera_fovy_deg": 60.0,
-            "camera_fovx_deg": 80.0,
-        },
-        np.zeros((480, 640, 3), dtype=np.uint8),
-        bullseye_source=BullseyeSource.VISION,
-        bullseye_detector=FakeDetector(),
-    )
-
-    assert resolved["bullseye_source"] == "vision"
-    assert resolved["oracle_bullseye_pixel"] == [480.0, 120.0]
-    assert "bullseye_pixel" not in resolved
