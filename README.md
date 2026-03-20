@@ -5,9 +5,8 @@
 ## Features
 
 - Back-projection utilities for converting image-plane observations into aiming geometry
-- Open-loop aiming controllers for turret yaw and pitch
 - PID-based tracking demo for moving platform scenarios
-- CLI entrypoints for static, moving, and square-trajectory demos
+- OmegaConf-backed move configuration with a default example YAML
 
 ## Install
 
@@ -26,33 +25,24 @@ $env:TARGET_LOCK_LOCKON_PATH="D:\academic\python\lockon\src"
 Unified Typer CLI:
 
 ```bash
-target-lock static --server-addr 127.0.0.1:50051
-target-lock move --server-addr 127.0.0.1:50051
-target-lock square-pid --server-addr 127.0.0.1:50051
+target-lock move
+target-lock move --config examples/move/config.yaml
 ```
 
 Legacy entrypoints are still supported:
 
 ```bash
-target-lock-static --server-addr 127.0.0.1:50051
-target-lock-move --server-addr 127.0.0.1:50051
-target-lock-square-pid --server-addr 127.0.0.1:50051
+target-lock-move
 ```
 
-Model path configuration must be provided through CLI options, environment variables, or a `.env` file.
-CLI options have the highest priority, and there is no built-in fallback repo path anymore.
+The default configuration lives at `examples/move/config.yaml`.
+Tune motion, PID, alignment, vision, and runtime settings there instead of passing a long CLI argument list.
 
 ```powershell
-$env:TARGET_LOCK_AUTOAIM_REPO="D:\academic\python\autoaim"
 $env:TARGET_LOCK_ONNX_PATH="D:\academic\python\autoaim\yolo\point_yolo_v8.onnx"
 ```
 
-You can also create a project-local `.env` file from `.env.example` and fill in your local paths:
-
-```env
-TARGET_LOCK_AUTOAIM_REPO=D:\academic\python\autoaim
-TARGET_LOCK_ONNX_PATH=D:\academic\python\autoaim\yolo\point_yolo_v8.onnx
-```
+The example config reads `TARGET_LOCK_ONNX_PATH` through OmegaConf interpolation by default.
 
 The `lockon` environment expects a 6-element action vector:
 

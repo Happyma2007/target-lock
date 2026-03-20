@@ -9,8 +9,9 @@ dependencies = [
     "grpcio>=1.78.0,<2.0.0",
     "protobuf>=7.34.0,<8.0.0",
     "opencv-python>=4.13.0.92,<5.0.0.0",
-    "onnxruntime>=1.23.2,<2.0.0",
+    "onnxruntime<1.23",
     "typer (>=0.24.1,<0.25.0)",
+    "omegaconf (>=2.3.0,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -18,9 +19,7 @@ packages = [{include = "target_lock", from = "src"}]
 
 [project.scripts]
 target-lock = "target_lock.commands.app:main"
-target-lock-static = "target_lock.commands.app:legacy_static_main"
-target-lock-move = "target_lock.cli.legacy_move:main"
-target-lock-square-pid = "target_lock.commands.app:legacy_square_pid_main"
+target-lock-move = "target_lock.commands.app:legacy_move_main"
 
 
 

@@ -1,0 +1,76 @@
+server:
+  # lockon gRPC 服务地址
+  addr: 127.0.0.1:50051
+
+session:
+  # 最大运行步数，null 表示不设上限
+  max_steps: null
+  # 对准后是否自动开火
+  fire_when_aligned: true
+
+tracking:
+  # 靶心来源：vision 使用视觉结果，oracle 使用真值
+  bullseye_source: vision
+  alignment:
+    # 方位角对准阈值，单位为度
+    azimuth_deg: 0.18
+    # 俯仰角对准阈值，单位为度
+    elevation_deg: 0.18
+    # 图像平面 x 方向对准阈值
+    plane_x: 0.01
+    # 图像平面 y 方向对准阈值
+    plane_y: 0.01
+
+controller:
+  open_loop:
+    # 开环搜索时的 yaw 单步控制量，单位为弧度
+    yaw_step_rad: 0.08
+    # 开环搜索时的 pitch 单步控制量，单位为弧度
+    pitch_step_rad: 0.08
+  # 丢目标时水平扫描控制量
+  scan_yaw_command: 0.2
+  # 水平扫描反向阈值，单位为度
+  scan_limit_deg: 85.0
+  pid:
+    yaw:
+      # yaw 轴 PID 的比例项
+      kp: 2.4
+      # yaw 轴 PID 的积分项
+      ki: 0.05
+      # yaw 轴 PID 的微分项
+      kd: 0.32
+    pitch:
+      # pitch 轴 PID 的比例项
+      kp: 2.4
+      # pitch 轴 PID 的积分项
+      ki: 0.05
+      # pitch 轴 PID 的微分项
+      kd: 0.32
+    # PID 死区，小于该误差时不响应
+    deadband: 0.001
+    # PID 积分项限幅
+    integral_limit: 0.25
+    # PID 反馈输出限幅
+    feedback_limit: 0.65
+
+motion:
+  # 平面移动速度上限
+  move_speed: 0.16
+  # 底盘旋转扰动幅度上限
+  base_rot_scale: 0.025
+  # 每段随机运动保持的步数
+  hold_steps: 120
+  # 随机运动采样种子
+  seed: 0
+
+vision:
+  # YOLO onnx 模型路径，默认读取环境变量 TARGET_LOCK_ONNX_PATH
+  onnx_path: ${oc.env:TARGET_LOCK_ONNX_PATH,null}
+  # 模型输入尺寸无法直接推断时使用的回退值
+  img_size_fallback: 640
+  # 低于该分数的检测结果会被忽略
+  score_threshold: 0.0
+  # 视觉检测抽样倍率；1 表示每帧检测，n 表示每 n 帧检测一次并复用上次结果
+  detect_every_n_frames: 4
+  # 视觉检测指数平滑系数；1 表示不平滑，越小越平滑
+  smoothing_alpha: 0.8
