@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -8,7 +9,7 @@ import numpy as np
 from target_lock.controllers import ActionLayout
 import target_lock.runner.runner as common_module
 from target_lock.runner import AlignmentThreshold, BullseyeSource, Runner
-from target_lock.vision import BullseyeDetection
+from target_lock.vision import AsyncCvBullseyeVision, BullseyeDetection
 
 
 class _AlignedMetrics:
@@ -72,7 +73,7 @@ def test_runner_fires_every_aligned_step(monkeypatch) -> None:
             return None
 
         def reset(self) -> np.ndarray:
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
         def step(self, action: np.ndarray):
             recorded_actions.append(action.copy())
@@ -125,7 +126,7 @@ def test_runner_uses_vision_detection_when_available(monkeypatch) -> None:
             return None
 
         def reset(self) -> np.ndarray:
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
         def step(self, action: np.ndarray):
             del action
@@ -135,7 +136,7 @@ def test_runner_uses_vision_detection_when_available(monkeypatch) -> None:
                     "bullseye_pixel": [4, 2],
                     "camera_fovy_deg": 60.0,
                     "camera_fovx_deg": 80.0,
-                    "width": 8,
+                    "width": 40,
                     "height": 8,
                     "fire": {},
                 },
@@ -146,7 +147,7 @@ def test_runner_uses_vision_detection_when_available(monkeypatch) -> None:
 
         def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
             del observation, info
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
     class FakeDetector:
         def detect(self, frame_rgb: np.ndarray) -> BullseyeDetection | None:
@@ -189,17 +190,17 @@ def test_runner_does_not_fallback_to_oracle_when_vision_misses(monkeypatch) -> N
             return None
 
         def reset(self) -> np.ndarray:
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
         def step(self, action: np.ndarray):
             del action
             return SimpleNamespace(
-                observation=np.zeros((8, 8, 3), dtype=np.uint8),
+                observation=np.zeros((8, 40, 3), dtype=np.uint8),
                 info={
                     "bullseye_pixel": [4, 2],
                     "camera_fovy_deg": 60.0,
                     "camera_fovx_deg": 80.0,
-                    "width": 8,
+                    "width": 40,
                     "height": 8,
                     "fire": {},
                 },
@@ -210,7 +211,7 @@ def test_runner_does_not_fallback_to_oracle_when_vision_misses(monkeypatch) -> N
 
         def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
             del observation, info
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
     class FakeDetector:
         def detect(self, frame_rgb: np.ndarray) -> BullseyeDetection | None:
@@ -258,12 +259,12 @@ def test_runner_downsamples_vision_detection_and_reuses_last_result(monkeypatch)
         def step(self, action: np.ndarray):
             del action
             return SimpleNamespace(
-                observation=np.zeros((8, 8, 3), dtype=np.uint8),
+                observation=np.zeros((8, 40, 3), dtype=np.uint8),
                 info={
                     "bullseye_pixel": [4, 2],
                     "camera_fovy_deg": 60.0,
                     "camera_fovx_deg": 80.0,
-                    "width": 8,
+                    "width": 40,
                     "height": 8,
                     "fire": {},
                 },
@@ -274,7 +275,7 @@ def test_runner_downsamples_vision_detection_and_reuses_last_result(monkeypatch)
 
         def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
             del observation, info
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
     class FakeDetector:
         def __init__(self) -> None:
@@ -324,17 +325,17 @@ def test_runner_smooths_vision_detection(monkeypatch) -> None:
             return None
 
         def reset(self) -> np.ndarray:
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
         def step(self, action: np.ndarray):
             del action
             return SimpleNamespace(
-                observation=np.zeros((8, 8, 3), dtype=np.uint8),
+                observation=np.zeros((8, 40, 3), dtype=np.uint8),
                 info={
                     "bullseye_pixel": [4, 2],
                     "camera_fovy_deg": 60.0,
                     "camera_fovx_deg": 80.0,
-                    "width": 8,
+                    "width": 40,
                     "height": 8,
                     "fire": {},
                 },
@@ -345,7 +346,7 @@ def test_runner_smooths_vision_detection(monkeypatch) -> None:
 
         def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
             del observation, info
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return np.zeros((8, 40, 3), dtype=np.uint8)
 
     class FakeDetector:
         def __init__(self) -> None:
@@ -377,3 +378,166 @@ def test_runner_smooths_vision_detection(monkeypatch) -> None:
     assert detector.calls == 2
     assert controller.seen_info[0]["bullseye_pixel"] == [10.0, 2.0]
     assert controller.seen_info[1]["bullseye_pixel"] == [12.0, 2.0]
+
+
+def test_runner_polls_async_detector_between_submit_frames(monkeypatch) -> None:
+    action_layout = ActionLayout(size=6, yaw_index=3, pitch_index=4, fire_index=5)
+    controller = _AlwaysAlignedController()
+
+    class FakeSession:
+        def __init__(self, server_addr: str) -> None:
+            self.server_addr = server_addr
+
+        def __enter__(self) -> "FakeSession":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def reset(self) -> np.ndarray:
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+        def step(self, action: np.ndarray):
+            del action
+            return SimpleNamespace(
+                observation=np.zeros((8, 8, 3), dtype=np.uint8),
+                info={
+                    "bullseye_pixel": [4, 2],
+                    "camera_fovy_deg": 60.0,
+                    "camera_fovx_deg": 80.0,
+                    "width": 8,
+                    "height": 8,
+                    "fire": {},
+                },
+                reward=0.0,
+                terminated=False,
+                truncated=False,
+            )
+
+        def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
+            del observation, info
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+    class FakeAsyncDetector:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.latest_detection: BullseyeDetection | None = None
+            self.reset_called = False
+            self.close_called = False
+
+        def reset(self) -> None:
+            self.reset_called = True
+            self.latest_detection = None
+
+        def detect(self, frame_rgb: np.ndarray, info=None) -> BullseyeDetection | None:
+            del frame_rgb, info
+            self.calls += 1
+            if self.calls == 1:
+                self.latest_detection = BullseyeDetection(pixel_x=9.0, pixel_y=1.0, score=0.9, x_norm=0.2, y_norm=0.3)
+                return None
+            self.latest_detection = BullseyeDetection(pixel_x=15.0, pixel_y=1.0, score=0.9, x_norm=0.2, y_norm=0.3)
+            return BullseyeDetection(pixel_x=9.0, pixel_y=1.0, score=0.9, x_norm=0.2, y_norm=0.3)
+
+        def get_latest_detection(self) -> BullseyeDetection | None:
+            return self.latest_detection
+
+        def close(self) -> None:
+            self.close_called = True
+
+    detector = FakeAsyncDetector()
+    monkeypatch.setattr(common_module, "LockonSession", FakeSession)
+    monkeypatch.setattr(common_module.time, "sleep", lambda _: None)
+    monkeypatch.setitem(sys.modules, "cv2", _fake_cv2())
+
+    Runner(
+        server_addr="127.0.0.1:50051",
+        controller=controller,
+        action_layout=action_layout,
+        max_steps=4,
+        threshold=AlignmentThreshold(azimuth_deg=0.1, elevation_deg=0.1, plane_x=0.01, plane_y=0.01),
+        fire_when_aligned=False,
+        bullseye_source=BullseyeSource.VISION,
+        bullseye_detector=detector,
+        vision_detect_every_n_frames=2,
+    ).run()
+
+    assert detector.reset_called is True
+    assert detector.close_called is True
+    assert detector.calls == 2
+    assert "bullseye_pixel" not in controller.seen_info[0]
+    assert controller.seen_info[1]["bullseye_pixel"] == [9.0, 1.0]
+    assert controller.seen_info[2]["bullseye_pixel"] == [9.0, 1.0]
+    assert controller.seen_info[3]["bullseye_pixel"] == [15.0, 1.0]
+
+
+def test_runner_with_async_cv_detector_does_not_block_main_loop(monkeypatch) -> None:
+    action_layout = ActionLayout(size=6, yaw_index=3, pitch_index=4, fire_index=5)
+    controller = _AlwaysAlignedController()
+
+    class FakeSession:
+        def __init__(self, server_addr: str) -> None:
+            self.server_addr = server_addr
+
+        def __enter__(self) -> "FakeSession":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def reset(self) -> np.ndarray:
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+        def step(self, action: np.ndarray):
+            del action
+            return SimpleNamespace(
+                observation=np.zeros((8, 8, 3), dtype=np.uint8),
+                info={
+                    "bullseye_pixel": [4, 2],
+                    "camera_fovy_deg": 60.0,
+                    "camera_fovx_deg": 80.0,
+                    "width": 8,
+                    "height": 8,
+                    "fire": {},
+                },
+                reward=0.0,
+                terminated=False,
+                truncated=False,
+            )
+
+        def decode_frame(self, observation, info: dict[str, object]) -> np.ndarray:
+            del observation, info
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+    class SlowDetector:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def detect(self, frame_rgb: np.ndarray, info=None) -> BullseyeDetection | None:
+            del frame_rgb, info
+            self.calls += 1
+            time.sleep(0.05)
+            return BullseyeDetection(pixel_x=7.0, pixel_y=2.0, score=0.9, x_norm=0.2, y_norm=0.3)
+
+    slow_detector = SlowDetector()
+    async_detector = AsyncCvBullseyeVision(
+        onnx_path="unused.onnx",
+        detector_factory=lambda: slow_detector,
+    )
+    monkeypatch.setattr(common_module, "LockonSession", FakeSession)
+    monkeypatch.setattr(common_module.time, "sleep", lambda _: None)
+    monkeypatch.setitem(sys.modules, "cv2", _fake_cv2())
+
+    result = Runner(
+        server_addr="127.0.0.1:50051",
+        controller=controller,
+        action_layout=action_layout,
+        max_steps=5,
+        threshold=AlignmentThreshold(azimuth_deg=0.1, elevation_deg=0.1, plane_x=0.01, plane_y=0.01),
+        fire_when_aligned=False,
+        bullseye_source=BullseyeSource.VISION,
+        bullseye_detector=async_detector,
+    ).run()
+
+    assert len(controller.seen_info) == 5
+    assert slow_detector.calls < len(controller.seen_info)
+    assert "bullseye_pixel" not in controller.seen_info[0]

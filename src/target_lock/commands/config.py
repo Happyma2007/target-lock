@@ -76,6 +76,7 @@ class VisionConfig:
     score_threshold: float = 0.0
     detect_every_n_frames: int = 1
     smoothing_alpha: float = 1.0
+    async_inference: bool = True
 
 
 @dataclass(slots=True)

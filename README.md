@@ -34,6 +34,10 @@ target-lock-move
 默认配置文件位于 `examples/move/config.yaml`。
 建议在这里调整运动、PID、对齐阈值、视觉和运行时参数，而不是在命令行里传很长的参数列表。
 
+视觉配置里的 `vision.async_inference` 默认为 `true`。
+开启后 YOLO/ONNX 推理会在后台线程里执行，主控制循环不会阻塞等待检测结果。
+该模式采用 latest-only 策略，只保留最新待处理帧，不保证逐帧检测；`vision.detect_every_n_frames` 仍然生效，控制器会复用最近一次已完成的视觉结果。
+
 ```powershell
 $env:TARGET_LOCK_ONNX_PATH="D:\academic\python\autoaim\yolo\point_yolo_v8.onnx"
 ```
