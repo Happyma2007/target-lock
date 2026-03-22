@@ -49,6 +49,90 @@ class Tensor(_message.Message):
 Global___Tensor: _TypeAlias = Tensor  # noqa: Y015
 
 @_typing.final
+class TensorList(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def items(self) -> _containers.RepeatedCompositeFieldContainer[Global___Tensor]: ...
+    def __init__(
+        self,
+        *,
+        items: _abc.Iterable[Global___Tensor] | None = ...,
+    ) -> None: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["items", b"items"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+
+Global___TensorList: _TypeAlias = TensorList  # noqa: Y015
+
+@_typing.final
+class TensorDict(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    @_typing.final
+    class FieldsEntry(_message.Message):
+        DESCRIPTOR: _descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: _builtins.int
+        VALUE_FIELD_NUMBER: _builtins.int
+        key: _builtins.str
+        @_builtins.property
+        def value(self) -> Global___Tensor: ...
+        def __init__(
+            self,
+            *,
+            key: _builtins.str = ...,
+            value: Global___Tensor | None = ...,
+        ) -> None: ...
+        _HasFieldArgType: _TypeAlias = _typing.Literal["value", b"value"]  # noqa: Y015
+        def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+        _ClearFieldArgType: _TypeAlias = _typing.Literal["key", b"key", "value", b"value"]  # noqa: Y015
+        def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+
+    FIELDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def fields(self) -> _containers.MessageMap[_builtins.str, Global___Tensor]: ...
+    def __init__(
+        self,
+        *,
+        fields: _abc.Mapping[_builtins.str, Global___Tensor] | None = ...,
+    ) -> None: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["fields", b"fields"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+
+Global___TensorDict: _TypeAlias = TensorDict  # noqa: Y015
+
+@_typing.final
+class TensorValue(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TENSOR_FIELD_NUMBER: _builtins.int
+    LIST_FIELD_NUMBER: _builtins.int
+    DICT_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def tensor(self) -> Global___Tensor: ...
+    @_builtins.property
+    def list(self) -> Global___TensorList: ...
+    @_builtins.property
+    def dict(self) -> Global___TensorDict: ...
+    def __init__(
+        self,
+        *,
+        tensor: Global___Tensor | None = ...,
+        list: Global___TensorList | None = ...,
+        dict: Global___TensorDict | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["dict", b"dict", "kind", b"kind", "list", b"list", "tensor", b"tensor"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["dict", b"dict", "kind", b"kind", "list", b"list", "tensor", b"tensor"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType_kind: _TypeAlias = _typing.Literal["tensor", "list", "dict"]  # noqa: Y015
+    _WhichOneofArgType_kind: _TypeAlias = _typing.Literal["kind", b"kind"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType_kind) -> _WhichOneofReturnType_kind | None: ...
+
+Global___TensorValue: _TypeAlias = TensorValue  # noqa: Y015
+
+@_typing.final
 class EnvRequest(_message.Message):
     """===== 客户端请求 ====="""
 
@@ -119,14 +203,18 @@ class Reset(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     SEED_FIELD_NUMBER: _builtins.int
+    OPTIONS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def seed(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]: ...
+    @_builtins.property
+    def options(self) -> _containers.RepeatedCompositeFieldContainer[_struct_pb2.Struct]: ...
     def __init__(
         self,
         *,
         seed: _abc.Iterable[_builtins.int] | None = ...,
+        options: _abc.Iterable[_struct_pb2.Struct] | None = ...,
     ) -> None: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["seed", b"seed"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["options", b"options", "seed", b"seed"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
 
 Global___Reset: _TypeAlias = Reset  # noqa: Y015
@@ -136,16 +224,20 @@ class ResetReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     OBSERVATION_FIELD_NUMBER: _builtins.int
+    INFO_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def observation(self) -> Global___Tensor: ...
+    def observation(self) -> Global___TensorValue: ...
+    @_builtins.property
+    def info(self) -> _struct_pb2.Struct: ...
     def __init__(
         self,
         *,
-        observation: Global___Tensor | None = ...,
+        observation: Global___TensorValue | None = ...,
+        info: _struct_pb2.Struct | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["observation", b"observation"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["info", b"info", "observation", b"observation"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["observation", b"observation"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["info", b"info", "observation", b"observation"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
 
 Global___ResetReply: _TypeAlias = ResetReply  # noqa: Y015
@@ -158,11 +250,11 @@ class Step(_message.Message):
 
     ACTION_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def action(self) -> Global___Tensor: ...
+    def action(self) -> Global___TensorValue: ...
     def __init__(
         self,
         *,
-        action: Global___Tensor | None = ...,
+        action: Global___TensorValue | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["action", b"action"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
@@ -181,25 +273,25 @@ class StepReply(_message.Message):
     TRUNCATED_FIELD_NUMBER: _builtins.int
     INFO_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def observation(self) -> Global___Tensor: ...
+    def observation(self) -> Global___TensorValue: ...
     @_builtins.property
-    def reward(self) -> Global___Tensor: ...
+    def reward(self) -> _containers.RepeatedScalarFieldContainer[_builtins.float]: ...
     @_builtins.property
-    def terminated(self) -> Global___Tensor: ...
+    def terminated(self) -> _containers.RepeatedScalarFieldContainer[_builtins.bool]: ...
     @_builtins.property
-    def truncated(self) -> Global___Tensor: ...
+    def truncated(self) -> _containers.RepeatedScalarFieldContainer[_builtins.bool]: ...
     @_builtins.property
     def info(self) -> _struct_pb2.Struct: ...
     def __init__(
         self,
         *,
-        observation: Global___Tensor | None = ...,
-        reward: Global___Tensor | None = ...,
-        terminated: Global___Tensor | None = ...,
-        truncated: Global___Tensor | None = ...,
+        observation: Global___TensorValue | None = ...,
+        reward: _abc.Iterable[_builtins.float] | None = ...,
+        terminated: _abc.Iterable[_builtins.bool] | None = ...,
+        truncated: _abc.Iterable[_builtins.bool] | None = ...,
         info: _struct_pb2.Struct | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["info", b"info", "observation", b"observation", "reward", b"reward", "terminated", b"terminated", "truncated", b"truncated"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["info", b"info", "observation", b"observation"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
     _ClearFieldArgType: _TypeAlias = _typing.Literal["info", b"info", "observation", b"observation", "reward", b"reward", "terminated", b"terminated", "truncated", b"truncated"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
