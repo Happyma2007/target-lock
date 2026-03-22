@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package arm_stream;
+package gym_v2;
 
 import "google/protobuf/struct.proto";
 
-service ArmEnv {
+service GymEnv {
   // 单一的双向流，客户端发命令，服务端回结果。
   rpc StreamEnv(stream EnvRequest) returns (stream EnvReply);
 }
@@ -14,6 +14,22 @@ message Tensor {
   bytes data = 1;           // numpy.tobytes() 序列化后的原始字节
   repeated int64 shape = 2; // 张量维度，例如 [84, 84, 3]
   string dtype = 3;         // 数据类型，如 "float32", "uint8", "int64"
+}
+
+message TensorList {
+  repeated Tensor items = 1;
+}
+
+message TensorDict {
+  map<string, Tensor> fields = 1;
+}
+
+message TensorValue {
+  oneof kind {
+    Tensor tensor = 1;
+    TensorList list = 2;
+    TensorDict dict = 3;
+  }
 }
 
 // ===== 客户端请求 =====
@@ -36,23 +52,25 @@ message EnvReply {
 
 // ===== Reset =====
 message Reset {
-  repeated int32 seed = 1;
+  repeated int64 seed = 1;
+  repeated google.protobuf.Struct options = 2;
 }
 
 message ResetReply {
-  Tensor observation = 1;
+  TensorValue observation = 1;
+  google.protobuf.Struct info = 2;
 }
 
 // ===== Step =====
 message Step {
-  Tensor action = 1;
+  TensorValue action = 1;
 }
 
 message StepReply {
-  Tensor observation = 1;
-  Tensor reward = 2;
-  Tensor terminated = 3;
-  Tensor truncated = 4;
+  TensorValue observation = 1;
+  repeated float reward = 2;
+  repeated bool terminated = 3;
+  repeated bool truncated = 4;
   google.protobuf.Struct info = 5;
 }
 

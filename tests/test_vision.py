@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
+from threading import Event
 
 import pytest
 import numpy as np
 
-from target_lock.vision import DEFAULT_AUTOAIM_MODEL, OracleBullseyeVision, resolve_autoaim_onnx_path
+from target_lock.vision import AsyncCvBullseyeVision, DEFAULT_AUTOAIM_MODEL, OracleBullseyeVision, resolve_autoaim_onnx_path
+from target_lock.vision.base import BullseyeDetection
 
 
 def _create_model_file(repo_dir: Path) -> Path:
@@ -114,3 +117,156 @@ def test_oracle_bullseye_vision_reads_detection_from_info() -> None:
     assert detection.score == 1.0
     assert detection.x_norm == 0.5
     assert detection.y_norm == 0.25
+
+
+def _wait_until(predicate, *, timeout: float = 1.0) -> None:
+    deadline = time.perf_counter() + timeout
+    while time.perf_counter() < deadline:
+        if predicate():
+            return
+        time.sleep(0.005)
+    raise AssertionError("condition was not satisfied before timeout")
+
+
+def test_async_cv_bullseye_vision_keeps_only_latest_pending_frame() -> None:
+    releases = [Event(), Event()]
+    started = [Event(), Event()]
+    processed_frames: list[int] = []
+
+    class FakeDetector:
+        def detect(self, frame_rgb: np.ndarray, info=None) -> BullseyeDetection | None:
+            del info
+            frame_id = int(frame_rgb[0, 0, 0])
+            call_index = len(processed_frames)
+            processed_frames.append(frame_id)
+            started[call_index].set()
+            releases[call_index].wait(timeout=1.0)
+            return BullseyeDetection(
+                pixel_x=float(frame_id),
+                pixel_y=1.0,
+                score=0.9,
+                x_norm=0.1,
+                y_norm=0.2,
+            )
+
+    detector = AsyncCvBullseyeVision(
+        onnx_path="unused.onnx",
+        detector_factory=FakeDetector,
+    )
+    try:
+        frame_1 = np.full((4, 4, 3), 1, dtype=np.uint8)
+        frame_2 = np.full((4, 4, 3), 2, dtype=np.uint8)
+        frame_3 = np.full((4, 4, 3), 3, dtype=np.uint8)
+
+        started_at = time.perf_counter()
+        assert detector.detect(frame_1) is None
+        elapsed = time.perf_counter() - started_at
+        assert elapsed < 0.05
+
+        started[0].wait(timeout=1.0)
+        detector.detect(frame_2)
+        detector.detect(frame_3)
+
+        releases[0].set()
+        _wait_until(lambda: started[1].is_set())
+        assert processed_frames == [1, 3]
+
+        releases[1].set()
+        _wait_until(
+            lambda: (
+                detector.get_latest_detection() is not None
+                and detector.get_latest_detection().pixel_x == 3.0
+            )
+        )
+        latest = detector.get_latest_detection()
+        assert latest is not None
+        assert latest.to_pixel_list() == [3.0, 1.0]
+    finally:
+        detector.close()
+
+
+def test_async_cv_bullseye_vision_smooths_only_on_new_results() -> None:
+    releases = [Event(), Event()]
+    detections = [
+        BullseyeDetection(pixel_x=10.0, pixel_y=2.0, score=0.9, x_norm=0.2, y_norm=0.3),
+        BullseyeDetection(pixel_x=18.0, pixel_y=2.0, score=0.9, x_norm=0.2, y_norm=0.3),
+    ]
+
+    class FakeDetector:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def detect(self, frame_rgb: np.ndarray, info=None) -> BullseyeDetection | None:
+            del frame_rgb, info
+            call_index = self.calls
+            self.calls += 1
+            releases[call_index].wait(timeout=1.0)
+            return detections[call_index]
+
+    detector = AsyncCvBullseyeVision(
+        onnx_path="unused.onnx",
+        smoothing_alpha=0.25,
+        detector_factory=FakeDetector,
+    )
+    try:
+        frame = np.zeros((8, 40, 3), dtype=np.uint8)
+        info = {"width": 40, "height": 8}
+
+        assert detector.detect(frame, info=info) is None
+        releases[0].set()
+        _wait_until(lambda: detector.get_latest_detection() is not None)
+
+        first = detector.get_latest_detection()
+        assert first is not None
+        assert first.to_pixel_list() == [10.0, 2.0]
+        assert detector.get_latest_detection() is first
+
+        detector.detect(frame, info=info)
+        releases[1].set()
+        _wait_until(lambda: detector.get_latest_detection() is not first)
+
+        second = detector.get_latest_detection()
+        assert second is not None
+        assert second.to_pixel_list() == [12.0, 2.0]
+        assert detector.get_latest_detection() is second
+        assert detector.get_latest_detection().to_pixel_list() == [12.0, 2.0]
+    finally:
+        detector.close()
+
+
+def test_async_cv_bullseye_vision_clears_latest_detection_on_miss() -> None:
+    releases = [Event(), Event()]
+
+    class FakeDetector:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def detect(self, frame_rgb: np.ndarray, info=None) -> BullseyeDetection | None:
+            del frame_rgb, info
+            call_index = self.calls
+            self.calls += 1
+            releases[call_index].wait(timeout=1.0)
+            if call_index == 0:
+                return BullseyeDetection(pixel_x=6.0, pixel_y=3.0, score=0.9, x_norm=0.2, y_norm=0.3)
+            return None
+
+    detector = AsyncCvBullseyeVision(
+        onnx_path="unused.onnx",
+        detector_factory=FakeDetector,
+    )
+    try:
+        frame = np.zeros((8, 8, 3), dtype=np.uint8)
+        assert detector.detect(frame) is None
+        releases[0].set()
+        _wait_until(lambda: detector.get_latest_detection() is not None)
+
+        latest = detector.get_latest_detection()
+        assert latest is not None
+        assert latest.to_pixel_list() == [6.0, 3.0]
+
+        detector.detect(frame)
+        releases[1].set()
+        _wait_until(lambda: detector.get_latest_detection() is None)
+        assert detector.get_latest_detection() is None
+    finally:
+        detector.close()

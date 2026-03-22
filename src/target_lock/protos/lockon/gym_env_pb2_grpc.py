@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class ArmEnvStub(object):
+class GymEnvStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -35,13 +35,13 @@ class ArmEnvStub(object):
             channel: A grpc.Channel.
         """
         self.StreamEnv = channel.stream_stream(
-                '/arm_stream.ArmEnv/StreamEnv',
+                '/gym_v2.GymEnv/StreamEnv',
                 request_serializer=target__lock_dot_protos_dot_lockon_dot_gym__env__pb2.EnvRequest.SerializeToString,
                 response_deserializer=target__lock_dot_protos_dot_lockon_dot_gym__env__pb2.EnvReply.FromString,
                 _registered_method=True)
 
 
-class ArmEnvServicer(object):
+class GymEnvServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def StreamEnv(self, request_iterator, context):
@@ -52,7 +52,7 @@ class ArmEnvServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_ArmEnvServicer_to_server(servicer, server):
+def add_GymEnvServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'StreamEnv': grpc.stream_stream_rpc_method_handler(
                     servicer.StreamEnv,
@@ -61,13 +61,13 @@ def add_ArmEnvServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'arm_stream.ArmEnv', rpc_method_handlers)
+            'gym_v2.GymEnv', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('arm_stream.ArmEnv', rpc_method_handlers)
+    server.add_registered_method_handlers('gym_v2.GymEnv', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class ArmEnv(object):
+class GymEnv(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -84,7 +84,7 @@ class ArmEnv(object):
         return grpc.experimental.stream_stream(
             request_iterator,
             target,
-            '/arm_stream.ArmEnv/StreamEnv',
+            '/gym_v2.GymEnv/StreamEnv',
             target__lock_dot_protos_dot_lockon_dot_gym__env__pb2.EnvRequest.SerializeToString,
             target__lock_dot_protos_dot_lockon_dot_gym__env__pb2.EnvReply.FromString,
             options,

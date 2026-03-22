@@ -26,21 +26,21 @@ class _ServicerContext(_grpc.ServicerContext, _aio.ServicerContext):  # type: ig
 GRPC_GENERATED_VERSION: str
 GRPC_VERSION: str
 
-class ArmEnvStub:
+class GymEnvStub:
     @_typing.overload
     def __new__(cls, channel: _grpc.Channel) -> _Self: ...
     @_typing.overload
-    def __new__(cls, channel: _aio.Channel) -> ArmEnvAsyncStub: ...
+    def __new__(cls, channel: _aio.Channel) -> GymEnvAsyncStub: ...
     StreamEnv: _grpc.StreamStreamMultiCallable[_gym_env_pb2.EnvRequest, _gym_env_pb2.EnvReply]
     """单一的双向流，客户端发命令，服务端回结果。"""
 
 @_typing.type_check_only
-class ArmEnvAsyncStub(ArmEnvStub):
+class GymEnvAsyncStub(GymEnvStub):
     def __init__(self, channel: _aio.Channel) -> None: ...
     StreamEnv: _aio.StreamStreamMultiCallable[_gym_env_pb2.EnvRequest, _gym_env_pb2.EnvReply]  # type: ignore[assignment]
     """单一的双向流，客户端发命令，服务端回结果。"""
 
-class ArmEnvServicer(metaclass=_abc_1.ABCMeta):
+class GymEnvServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
     def StreamEnv(
         self,
@@ -49,4 +49,4 @@ class ArmEnvServicer(metaclass=_abc_1.ABCMeta):
     ) -> _typing.Union[_abc.Iterator[_gym_env_pb2.EnvReply], _abc.AsyncIterator[_gym_env_pb2.EnvReply]]:
         """单一的双向流，客户端发命令，服务端回结果。"""
 
-def add_ArmEnvServicer_to_server(servicer: ArmEnvServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...
+def add_GymEnvServicer_to_server(servicer: GymEnvServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

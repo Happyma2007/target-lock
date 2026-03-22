@@ -16,6 +16,7 @@ from target_lock.geometry import (
 )
 from target_lock.runner import AlignmentThreshold, BullseyeSource, Runner
 from target_lock.vision import (
+    AsyncCvBullseyeVision,
     BullseyeDetection,
     BullseyeVision,
     CvBullseyeVision,
@@ -27,6 +28,7 @@ from target_lock.vision import (
 
 __all__ = [
     "ActionLayout",
+    "AsyncCvBullseyeVision",
     "AlignmentThreshold",
     "AxisPid",
     "BullseyeDetection",

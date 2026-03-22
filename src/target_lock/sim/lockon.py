@@ -40,6 +40,13 @@ def array_from_tensor(tensor: gym_env_pb2.Tensor) -> np.ndarray:
     return array.reshape(())
 
 
+def tensor_from_value(value: gym_env_pb2.TensorValue, *, field_name: str) -> gym_env_pb2.Tensor:
+    kind = value.WhichOneof("kind")
+    if kind != "tensor":
+        raise RuntimeError(f"{field_name} must be tensor-valued, got {kind or 'unset'}")
+    return value.tensor
+
+
 class ObservationDecoder:
     def __init__(self, tensor_dtype: str) -> None:
         self.tensor_dtype = tensor_dtype
@@ -86,7 +93,7 @@ class LockonSession:
 
     def __enter__(self) -> "LockonSession":
         self.channel = self.grpc.insecure_channel(self.server_addr)
-        self.stub = self.gym_env_pb2_grpc.ArmEnvStub(self.channel)
+        self.stub = self.gym_env_pb2_grpc.GymEnvStub(self.channel)
         self.responses = self.stub.StreamEnv(self._request_iterator())
         return self
 
@@ -112,7 +119,9 @@ class LockonSession:
         reply = next(self.responses)
         if reply.WhichOneof("result") != "reset":
             raise RuntimeError("expected ResetReply")
-        return self.decode_frame(reply.reset.observation, {})
+        info = self.MessageToDict(reply.reset.info, preserving_proto_field_name=True)
+        observation = tensor_from_value(reply.reset.observation, field_name="reset.observation")
+        return self.decode_frame(observation, info)
 
     def decode_frame(self, observation: Any, info: dict[str, object]) -> np.ndarray:
         if self.decoder is None or getattr(self.decoder, "tensor_dtype", None) != observation.dtype:
@@ -123,19 +132,31 @@ class LockonSession:
         return self.decoder.decode(observation, info)
 
     def step(self, action: np.ndarray) -> StepResult:
+        action_array = np.asarray(action, dtype=np.float32)
+        if action_array.shape != (6,):
+            raise ValueError(f"target-lock expects single-env action shape [6], got {list(action_array.shape)}")
+
         self.request_queue.put(
             self.gym_env_pb2.EnvRequest(
-                step=self.gym_env_pb2.Step(action=self.tensor_from_array(action.astype(np.float32)))
+                step=self.gym_env_pb2.Step(
+                    action=self.gym_env_pb2.TensorValue(tensor=self.tensor_from_array(action_array))
+                )
             )
         )
         reply = next(self.responses)
         if reply.WhichOneof("result") != "step":
             raise RuntimeError("expected StepReply")
         info = self.MessageToDict(reply.step.info, preserving_proto_field_name=True)
+        observation = tensor_from_value(reply.step.observation, field_name="step.observation")
+        reward = list(reply.step.reward)
+        terminated = list(reply.step.terminated)
+        truncated = list(reply.step.truncated)
+        if len(reward) != 1 or len(terminated) != 1 or len(truncated) != 1:
+            raise RuntimeError("target-lock expects single-env repeated scalars in StepReply")
         return StepResult(
-            observation=reply.step.observation,
+            observation=observation,
             info=info,
-            reward=float(self.array_from_tensor(reply.step.reward)),
-            terminated=bool(self.array_from_tensor(reply.step.terminated)),
-            truncated=bool(self.array_from_tensor(reply.step.truncated)),
+            reward=float(reward[0]),
+            terminated=bool(terminated[0]),
+            truncated=bool(truncated[0]),
         )

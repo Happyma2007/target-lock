@@ -63,6 +63,7 @@ class ControllerConfig:
 
 @dataclass(slots=True)
 class MotionConfig:
+    manual_base_control: bool = False
     move_speed: float = 0.08
     base_rot_scale: float = 0.025
     hold_steps: int = 120
@@ -76,6 +77,7 @@ class VisionConfig:
     score_threshold: float = 0.0
     detect_every_n_frames: int = 1
     smoothing_alpha: float = 1.0
+    async_inference: bool = True
 
 
 @dataclass(slots=True)

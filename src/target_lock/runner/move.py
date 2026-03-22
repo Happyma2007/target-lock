@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
@@ -14,7 +16,10 @@ from target_lock.commands.config import (
 )
 from target_lock.controllers import ActionLayout, OpenLoopAimConfig, PidAimConfig, PidAimController
 from target_lock.runner.runner import AlignmentThreshold, BullseyeSource, Runner
-from target_lock.vision import CvBullseyeVision, OracleBullseyeVision, resolve_autoaim_onnx_path
+from target_lock.vision import AsyncCvBullseyeVision, CvBullseyeVision, OracleBullseyeVision, resolve_autoaim_onnx_path
+
+
+MANUAL_BASE_KEY_LATCH_SECONDS = 0.12
 
 
 def build_action_layout() -> ActionLayout:
@@ -65,11 +70,15 @@ def build_bullseye_detector(
     bullseye_source = BullseyeSource(tracking.bullseye_source)
     if bullseye_source == BullseyeSource.ORACLE:
         return OracleBullseyeVision()
-    return CvBullseyeVision(
-        onnx_path=resolve_autoaim_onnx_path(None, vision.onnx_path),
-        img_size_fallback=vision.img_size_fallback,
-        score_threshold=vision.score_threshold,
-    )
+    detector_cls = AsyncCvBullseyeVision if vision.async_inference else CvBullseyeVision
+    detector_kwargs = {
+        "onnx_path": resolve_autoaim_onnx_path(None, vision.onnx_path),
+        "img_size_fallback": vision.img_size_fallback,
+        "score_threshold": vision.score_threshold,
+    }
+    if vision.async_inference:
+        detector_kwargs["smoothing_alpha"] = vision.smoothing_alpha
+    return detector_cls(**detector_kwargs)
 
 
 def random_trajectory_action(
@@ -122,6 +131,60 @@ def square_trajectory_action(
     return action
 
 
+@dataclass(slots=True)
+class ManualBaseMotionMutator:
+    move_speed: float
+    base_rot_scale: float
+    key_latch_seconds: float = MANUAL_BASE_KEY_LATCH_SECONDS
+    _last_command: str | None = field(init=False, default=None)
+    _last_command_at: float = field(init=False, default=0.0)
+
+    def handle_key(self, key_code: int) -> None:
+        if key_code < 0:
+            return
+        try:
+            key = chr(key_code & 0xFF).lower()
+        except ValueError:
+            return
+
+        if key == " ":
+            self._last_command = None
+            self._last_command_at = 0.0
+            return
+
+        if key not in {"w", "a", "s", "d", "q", "e"}:
+            return
+
+        self._last_command = key
+        self._last_command_at = time.monotonic()
+
+    def __call__(self, step_idx: int, action: np.ndarray) -> np.ndarray:
+        del step_idx
+        action[0] = 0.0
+        action[1] = 0.0
+        action[2] = 0.0
+
+        if self._last_command is None:
+            return action
+        if time.monotonic() - self._last_command_at > self.key_latch_seconds:
+            self._last_command = None
+            return action
+
+        if self._last_command == "w":
+            action[0] = self.move_speed
+        elif self._last_command == "s":
+            action[0] = -self.move_speed
+        elif self._last_command == "a":
+            action[1] = self.move_speed
+        elif self._last_command == "d":
+            action[1] = -self.move_speed
+        elif self._last_command == "q":
+            action[2] = self.base_rot_scale
+        elif self._last_command == "e":
+            action[2] = -self.base_rot_scale
+        return action
+
+
 def build_random_motion_mutator(
     config: MotionConfig,
 ) -> Callable[[int, np.ndarray], np.ndarray]:
@@ -146,6 +209,17 @@ def build_random_motion_mutator(
     return action_mutator
 
 
+def build_motion_mutator(
+    config: MotionConfig,
+) -> Callable[[int, np.ndarray], np.ndarray]:
+    if config.manual_base_control:
+        return ManualBaseMotionMutator(
+            move_speed=config.move_speed,
+            base_rot_scale=config.base_rot_scale,
+        )
+    return build_random_motion_mutator(config)
+
+
 def run_move(config: MoveCommandConfig) -> dict[str, object]:
     bullseye_source = BullseyeSource(config.tracking.bullseye_source)
     action_layout = build_action_layout()
@@ -157,6 +231,7 @@ def run_move(config: MoveCommandConfig) -> dict[str, object]:
         tracking=config.tracking,
         vision=config.vision,
     )
+    use_async_vision = bullseye_source == BullseyeSource.VISION and config.vision.async_inference
     return Runner(
         server_addr=config.server.addr,
         controller=controller,
@@ -164,11 +239,11 @@ def run_move(config: MoveCommandConfig) -> dict[str, object]:
         max_steps=config.session.max_steps,
         threshold=build_alignment_threshold(config.tracking.alignment),
         fire_when_aligned=config.session.fire_when_aligned,
-        action_mutator=build_random_motion_mutator(config.motion),
+        action_mutator=build_motion_mutator(config.motion),
         bullseye_source=bullseye_source,
         bullseye_detector=bullseye_detector,
         vision_detect_every_n_frames=config.vision.detect_every_n_frames,
-        vision_smoothing_alpha=config.vision.smoothing_alpha,
+        vision_smoothing_alpha=1.0 if use_async_vision else config.vision.smoothing_alpha,
     ).run()
 
 
@@ -176,7 +251,9 @@ __all__ = [
     "build_action_layout",
     "build_alignment_threshold",
     "build_bullseye_detector",
+    "build_motion_mutator",
     "build_pid_controller",
+    "ManualBaseMotionMutator",
     "build_random_motion_mutator",
     "random_trajectory_action",
     "run_move",

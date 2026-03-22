@@ -54,6 +54,8 @@ controller:
     feedback_limit: 0.65
 
 motion:
+  # 是否启用手动底座控制；开启后使用 WASD 平移、Q/E 旋转，而不是随机运动
+  manual_base_control: false
   # 平面移动速度上限
   move_speed: 0.16
   # 底盘旋转扰动幅度上限
@@ -70,6 +72,8 @@ vision:
   img_size_fallback: 640
   # 低于该分数的检测结果会被忽略
   score_threshold: 0.0
+  # 是否在后台线程执行视觉推理；开启后主循环不会等待 YOLO 推理完成
+  async_inference: true
   # 视觉检测抽样倍率；1 表示每帧检测，n 表示每 n 帧检测一次并复用上次结果
   detect_every_n_frames: 4
   # 视觉检测指数平滑系数；1 表示不平滑，越小越平滑
