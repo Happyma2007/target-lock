@@ -72,12 +72,14 @@ class MotionConfig:
 
 @dataclass(slots=True)
 class VisionConfig:
-    onnx_path: str | None = None
-    img_size_fallback: int = 640
+    engine_addr: str = "127.0.0.1:50051"
+    image_format: str = "h264"
     score_threshold: float = 0.0
+    max_detections: int = 1
+    request_timeout_s: float | None = None
     detect_every_n_frames: int = 1
     smoothing_alpha: float = 1.0
-    async_inference: bool = True
+    async_inference: bool = False
 
 
 @dataclass(slots=True)

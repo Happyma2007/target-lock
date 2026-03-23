@@ -16,7 +16,7 @@ from target_lock.commands.config import (
 )
 from target_lock.controllers import ActionLayout, OpenLoopAimConfig, PidAimConfig, PidAimController
 from target_lock.runner.runner import AlignmentThreshold, BullseyeSource, Runner
-from target_lock.vision import AsyncCvBullseyeVision, CvBullseyeVision, OracleBullseyeVision, resolve_autoaim_onnx_path
+from target_lock.vision import CvBullseyeVision, OracleBullseyeVision
 
 
 MANUAL_BASE_KEY_LATCH_SECONDS = 0.12
@@ -70,15 +70,14 @@ def build_bullseye_detector(
     bullseye_source = BullseyeSource(tracking.bullseye_source)
     if bullseye_source == BullseyeSource.ORACLE:
         return OracleBullseyeVision()
-    detector_cls = AsyncCvBullseyeVision if vision.async_inference else CvBullseyeVision
     detector_kwargs = {
-        "onnx_path": resolve_autoaim_onnx_path(None, vision.onnx_path),
-        "img_size_fallback": vision.img_size_fallback,
+        "engine_addr": vision.engine_addr,
+        "image_format": vision.image_format,
         "score_threshold": vision.score_threshold,
+        "max_detections": vision.max_detections,
+        "request_timeout_s": vision.request_timeout_s,
     }
-    if vision.async_inference:
-        detector_kwargs["smoothing_alpha"] = vision.smoothing_alpha
-    return detector_cls(**detector_kwargs)
+    return CvBullseyeVision(**detector_kwargs)
 
 
 def random_trajectory_action(
@@ -231,7 +230,6 @@ def run_move(config: MoveCommandConfig) -> dict[str, object]:
         tracking=config.tracking,
         vision=config.vision,
     )
-    use_async_vision = bullseye_source == BullseyeSource.VISION and config.vision.async_inference
     return Runner(
         server_addr=config.server.addr,
         controller=controller,
@@ -243,7 +241,7 @@ def run_move(config: MoveCommandConfig) -> dict[str, object]:
         bullseye_source=bullseye_source,
         bullseye_detector=bullseye_detector,
         vision_detect_every_n_frames=config.vision.detect_every_n_frames,
-        vision_smoothing_alpha=1.0 if use_async_vision else config.vision.smoothing_alpha,
+        vision_smoothing_alpha=config.vision.smoothing_alpha,
     ).run()
 
 

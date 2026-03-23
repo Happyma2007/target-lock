@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from threading import Condition, Event, Thread
 from typing import Callable, Mapping
 
 import numpy as np
 
 from target_lock.vision.base import BullseyeDetection, BullseyeDetector, build_detection
-from target_lock.vision.cv import CvBullseyeVision
+from target_lock.vision.cv import GrpcBullseyeVision
 
 
 @dataclass(slots=True)
@@ -17,22 +16,30 @@ class _PendingRequest:
     info: dict[str, object]
 
 
-class AsyncCvBullseyeVision:
+class AsyncGrpcBullseyeVision:
     def __init__(
         self,
         *,
-        onnx_path: str | Path,
-        img_size_fallback: int = 640,
+        engine_addr: str,
+        image_format: str = "h264",
         score_threshold: float = 0.0,
+        max_detections: int = 1,
+        request_timeout_s: float | None = None,
+        ffmpeg_bin: str = "ffmpeg",
+        h264_preset: str = "ultrafast",
         smoothing_alpha: float = 1.0,
         detector_factory: Callable[[], BullseyeDetector] | None = None,
     ) -> None:
         if not 0.0 < float(smoothing_alpha) <= 1.0:
             raise ValueError("smoothing_alpha must be in (0.0, 1.0]")
 
-        self.onnx_path = Path(onnx_path).expanduser()
-        self.img_size_fallback = int(img_size_fallback)
+        self.engine_addr = engine_addr
+        self.image_format = image_format
         self.score_threshold = float(score_threshold)
+        self.max_detections = int(max_detections)
+        self.request_timeout_s = request_timeout_s
+        self.ffmpeg_bin = ffmpeg_bin
+        self.h264_preset = h264_preset
         self.smoothing_alpha = float(smoothing_alpha)
         self._detector_factory = detector_factory or self._build_detector
 
@@ -63,7 +70,7 @@ class AsyncCvBullseyeVision:
         )
         with self._condition:
             if self._closed:
-                raise RuntimeError("AsyncCvBullseyeVision is closed")
+                raise RuntimeError("AsyncGrpcBullseyeVision is closed")
             current = self._latest_detection
             self._pending_request = request
             self._condition.notify()
@@ -88,10 +95,14 @@ class AsyncCvBullseyeVision:
         self._thread.join()
 
     def _build_detector(self) -> BullseyeDetector:
-        return CvBullseyeVision(
-            onnx_path=self.onnx_path,
-            img_size_fallback=self.img_size_fallback,
+        return GrpcBullseyeVision(
+            engine_addr=self.engine_addr,
+            image_format=self.image_format,
             score_threshold=self.score_threshold,
+            max_detections=self.max_detections,
+            request_timeout_s=self.request_timeout_s,
+            ffmpeg_bin=self.ffmpeg_bin,
+            h264_preset=self.h264_preset,
         )
 
     def _worker_main(self) -> None:
@@ -157,4 +168,7 @@ class AsyncCvBullseyeVision:
 
     def _raise_if_worker_failed(self) -> None:
         if self._worker_exception is not None:
-            raise RuntimeError("AsyncCvBullseyeVision worker failed") from self._worker_exception
+            raise RuntimeError("AsyncGrpcBullseyeVision worker failed") from self._worker_exception
+
+
+AsyncCvBullseyeVision = AsyncGrpcBullseyeVision

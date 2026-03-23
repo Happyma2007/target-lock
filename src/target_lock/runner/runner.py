@@ -167,6 +167,7 @@ class Runner:
                 resolved.pop("bullseye_pixel", None)
                 resolved.pop("vision_bullseye_score", None)
                 resolved.pop("vision_bullseye_norm", None)
+                self._clear_vision_debug_info(resolved)
             return resolved
 
         if self.bullseye_source == BullseyeSource.VISION:
@@ -274,6 +275,7 @@ class Runner:
     ) -> dict[str, object]:
         resolved = dict(info)
         resolved["bullseye_source"] = BullseyeSource.ORACLE.value
+        self._clear_vision_debug_info(resolved)
         resolved.pop("vision_bullseye_score", None)
         resolved.pop("vision_bullseye_norm", None)
         if detection is None:
@@ -288,6 +290,7 @@ class Runner:
     ) -> dict[str, object]:
         resolved = dict(info)
         resolved["bullseye_source"] = BullseyeSource.VISION.value
+        self._apply_vision_debug_info(resolved)
         resolved.pop("bullseye_pixel", None)
         resolved.pop("vision_bullseye_score", None)
         resolved.pop("vision_bullseye_norm", None)
@@ -298,6 +301,40 @@ class Runner:
         resolved["vision_bullseye_score"] = detection.score
         resolved["vision_bullseye_norm"] = [detection.x_norm, detection.y_norm]
         return resolved
+
+    def _apply_vision_debug_info(self, resolved: dict[str, object]) -> None:
+        detector = self.bullseye_detector
+        if detector is None:
+            self._clear_vision_debug_info(resolved)
+            return
+        get_debug_state = getattr(detector, "get_debug_state", None)
+        if not callable(get_debug_state):
+            self._clear_vision_debug_info(resolved)
+            return
+        debug_state = get_debug_state()
+        if not isinstance(debug_state, dict):
+            self._clear_vision_debug_info(resolved)
+            return
+        for key in (
+            "vision_input_frame_id",
+            "vision_input_sync_id",
+            "vision_detection_frame_id",
+            "vision_detection_sync_id",
+            "vision_detection_status",
+        ):
+            value = debug_state.get(key)
+            if value is None:
+                resolved.pop(key, None)
+            else:
+                resolved[key] = value
+
+    @staticmethod
+    def _clear_vision_debug_info(resolved: dict[str, object]) -> None:
+        resolved.pop("vision_input_frame_id", None)
+        resolved.pop("vision_input_sync_id", None)
+        resolved.pop("vision_detection_frame_id", None)
+        resolved.pop("vision_detection_sync_id", None)
+        resolved.pop("vision_detection_status", None)
 
     def _build_display(
         self,
@@ -347,6 +384,21 @@ class Runner:
         vision_score = info.get("vision_bullseye_score")
         if isinstance(vision_score, (float, int)):
             lines.append(f"vision_score={float(vision_score):.3f}")
+        input_frame_id = info.get("vision_input_frame_id")
+        input_sync_id = info.get("vision_input_sync_id")
+        if isinstance(input_frame_id, int) or isinstance(input_sync_id, int):
+            lines.append(f"vision_input frame={input_frame_id} sync={input_sync_id}")
+        detection_frame_id = info.get("vision_detection_frame_id")
+        detection_sync_id = info.get("vision_detection_sync_id")
+        detection_status = info.get("vision_detection_status")
+        if (
+            isinstance(detection_frame_id, int)
+            or isinstance(detection_sync_id, int)
+            or isinstance(detection_status, str)
+        ):
+            lines.append(
+                f"vision_det frame={detection_frame_id} sync={detection_sync_id} status={detection_status}"
+            )
         if metrics is not None:
             lines.extend(f"{key}={value:.3f}" for key, value in metrics.items())
         qpos = info.get("qpos")

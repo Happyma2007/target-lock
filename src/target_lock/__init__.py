@@ -17,25 +17,26 @@ from target_lock.geometry import (
 from target_lock.runner import AlignmentThreshold, BullseyeSource, Runner
 from target_lock.vision import (
     AsyncCvBullseyeVision,
+    AsyncGrpcBullseyeVision,
     BullseyeDetection,
     BullseyeVision,
     CvBullseyeVision,
-    DEFAULT_AUTOAIM_MODEL,
+    GrpcBullseyeVision,
     OracleBullseyeVision,
     YoloBullseyeDetector,
-    resolve_autoaim_onnx_path,
 )
 
 __all__ = [
     "ActionLayout",
     "AsyncCvBullseyeVision",
+    "AsyncGrpcBullseyeVision",
     "AlignmentThreshold",
     "AxisPid",
     "BullseyeDetection",
     "BullseyeVision",
     "BullseyeSource",
     "CvBullseyeVision",
-    "DEFAULT_AUTOAIM_MODEL",
+    "GrpcBullseyeVision",
     "OpenLoopAimConfig",
     "OpenLoopAimController",
     "OpenLoopMetrics",
@@ -49,5 +50,4 @@ __all__ = [
     "backproject_direction",
     "backproject_to_spherical",
     "direction_to_spherical",
-    "resolve_autoaim_onnx_path",
 ]
