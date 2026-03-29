@@ -25,31 +25,41 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'target_lock/protos/lockon/gym_env.proto\x12\narm_stream\x1a\x1cgoogle/protobuf/struct.proto\"4\n\x06Tensor\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05shape\x18\x02 \x03(\x03\x12\r\n\x05\x64type\x18\x03 \x01(\t\"}\n\nEnvRequest\x12\"\n\x05reset\x18\x01 \x01(\x0b\x32\x11.arm_stream.ResetH\x00\x12 \n\x04step\x18\x02 \x01(\x0b\x32\x10.arm_stream.StepH\x00\x12\"\n\x05\x63lose\x18\x03 \x01(\x0b\x32\x11.arm_stream.CloseH\x00\x42\x05\n\x03\x63md\"\x8d\x01\n\x08\x45nvReply\x12\'\n\x05reset\x18\x01 \x01(\x0b\x32\x16.arm_stream.ResetReplyH\x00\x12%\n\x04step\x18\x02 \x01(\x0b\x32\x15.arm_stream.StepReplyH\x00\x12\'\n\x05\x63lose\x18\x03 \x01(\x0b\x32\x16.arm_stream.CloseReplyH\x00\x42\x08\n\x06result\"\x15\n\x05Reset\x12\x0c\n\x04seed\x18\x01 \x03(\x05\"5\n\nResetReply\x12\'\n\x0bobservation\x18\x01 \x01(\x0b\x32\x12.arm_stream.Tensor\"*\n\x04Step\x12\"\n\x06\x61\x63tion\x18\x01 \x01(\x0b\x32\x12.arm_stream.Tensor\"\xce\x01\n\tStepReply\x12\'\n\x0bobservation\x18\x01 \x01(\x0b\x32\x12.arm_stream.Tensor\x12\"\n\x06reward\x18\x02 \x01(\x0b\x32\x12.arm_stream.Tensor\x12&\n\nterminated\x18\x03 \x01(\x0b\x32\x12.arm_stream.Tensor\x12%\n\ttruncated\x18\x04 \x01(\x0b\x32\x12.arm_stream.Tensor\x12%\n\x04info\x18\x05 \x01(\x0b\x32\x17.google.protobuf.Struct\"\x07\n\x05\x43lose\"\x0c\n\nCloseReply2G\n\x06\x41rmEnv\x12=\n\tStreamEnv\x12\x16.arm_stream.EnvRequest\x1a\x14.arm_stream.EnvReply(\x01\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'target_lock/protos/lockon/gym_env.proto\x12\x06gym_v2\x1a\x1cgoogle/protobuf/struct.proto\"4\n\x06Tensor\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05shape\x18\x02 \x03(\x03\x12\r\n\x05\x64type\x18\x03 \x01(\t\"+\n\nTensorList\x12\x1d\n\x05items\x18\x01 \x03(\x0b\x32\x0e.gym_v2.Tensor\"{\n\nTensorDict\x12.\n\x06\x66ields\x18\x01 \x03(\x0b\x32\x1e.gym_v2.TensorDict.FieldsEntry\x1a=\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.gym_v2.Tensor:\x02\x38\x01\"\x7f\n\x0bTensorValue\x12 \n\x06tensor\x18\x01 \x01(\x0b\x32\x0e.gym_v2.TensorH\x00\x12\"\n\x04list\x18\x02 \x01(\x0b\x32\x12.gym_v2.TensorListH\x00\x12\"\n\x04\x64ict\x18\x03 \x01(\x0b\x32\x12.gym_v2.TensorDictH\x00\x42\x06\n\x04kind\"q\n\nEnvRequest\x12\x1e\n\x05reset\x18\x01 \x01(\x0b\x32\r.gym_v2.ResetH\x00\x12\x1c\n\x04step\x18\x02 \x01(\x0b\x32\x0c.gym_v2.StepH\x00\x12\x1e\n\x05\x63lose\x18\x03 \x01(\x0b\x32\r.gym_v2.CloseH\x00\x42\x05\n\x03\x63md\"\x81\x01\n\x08\x45nvReply\x12#\n\x05reset\x18\x01 \x01(\x0b\x32\x12.gym_v2.ResetReplyH\x00\x12!\n\x04step\x18\x02 \x01(\x0b\x32\x11.gym_v2.StepReplyH\x00\x12#\n\x05\x63lose\x18\x03 \x01(\x0b\x32\x12.gym_v2.CloseReplyH\x00\x42\x08\n\x06result\"?\n\x05Reset\x12\x0c\n\x04seed\x18\x01 \x03(\x03\x12(\n\x07options\x18\x02 \x03(\x0b\x32\x17.google.protobuf.Struct\"]\n\nResetReply\x12(\n\x0bobservation\x18\x01 \x01(\x0b\x32\x13.gym_v2.TensorValue\x12%\n\x04info\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\"+\n\x04Step\x12#\n\x06\x61\x63tion\x18\x01 \x01(\x0b\x32\x13.gym_v2.TensorValue\"\x93\x01\n\tStepReply\x12(\n\x0bobservation\x18\x01 \x01(\x0b\x32\x13.gym_v2.TensorValue\x12\x0e\n\x06reward\x18\x02 \x03(\x02\x12\x12\n\nterminated\x18\x03 \x03(\x08\x12\x11\n\ttruncated\x18\x04 \x03(\x08\x12%\n\x04info\x18\x05 \x01(\x0b\x32\x17.google.protobuf.Struct\"\x07\n\x05\x43lose\"\x0c\n\nCloseReply2?\n\x06GymEnv\x12\x35\n\tStreamEnv\x12\x12.gym_v2.EnvRequest\x1a\x10.gym_v2.EnvReply(\x01\x30\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'target_lock.protos.lockon.gym_env_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_TENSOR']._serialized_start=85
-  _globals['_TENSOR']._serialized_end=137
-  _globals['_ENVREQUEST']._serialized_start=139
-  _globals['_ENVREQUEST']._serialized_end=264
-  _globals['_ENVREPLY']._serialized_start=267
-  _globals['_ENVREPLY']._serialized_end=408
-  _globals['_RESET']._serialized_start=410
-  _globals['_RESET']._serialized_end=431
-  _globals['_RESETREPLY']._serialized_start=433
-  _globals['_RESETREPLY']._serialized_end=486
-  _globals['_STEP']._serialized_start=488
-  _globals['_STEP']._serialized_end=530
-  _globals['_STEPREPLY']._serialized_start=533
-  _globals['_STEPREPLY']._serialized_end=739
-  _globals['_CLOSE']._serialized_start=741
-  _globals['_CLOSE']._serialized_end=748
-  _globals['_CLOSEREPLY']._serialized_start=750
-  _globals['_CLOSEREPLY']._serialized_end=762
-  _globals['_ARMENV']._serialized_start=764
-  _globals['_ARMENV']._serialized_end=835
+  _globals['_TENSORDICT_FIELDSENTRY']._loaded_options = None
+  _globals['_TENSORDICT_FIELDSENTRY']._serialized_options = b'8\001'
+  _globals['_TENSOR']._serialized_start=76
+  _globals['_TENSOR']._serialized_end=128
+  _globals['_TENSORLIST']._serialized_start=130
+  _globals['_TENSORLIST']._serialized_end=173
+  _globals['_TENSORDICT']._serialized_start=175
+  _globals['_TENSORDICT']._serialized_end=298
+  _globals['_TENSORDICT_FIELDSENTRY']._serialized_start=237
+  _globals['_TENSORDICT_FIELDSENTRY']._serialized_end=298
+  _globals['_TENSORVALUE']._serialized_start=300
+  _globals['_TENSORVALUE']._serialized_end=427
+  _globals['_ENVREQUEST']._serialized_start=429
+  _globals['_ENVREQUEST']._serialized_end=542
+  _globals['_ENVREPLY']._serialized_start=545
+  _globals['_ENVREPLY']._serialized_end=674
+  _globals['_RESET']._serialized_start=676
+  _globals['_RESET']._serialized_end=739
+  _globals['_RESETREPLY']._serialized_start=741
+  _globals['_RESETREPLY']._serialized_end=834
+  _globals['_STEP']._serialized_start=836
+  _globals['_STEP']._serialized_end=879
+  _globals['_STEPREPLY']._serialized_start=882
+  _globals['_STEPREPLY']._serialized_end=1029
+  _globals['_CLOSE']._serialized_start=1031
+  _globals['_CLOSE']._serialized_end=1038
+  _globals['_CLOSEREPLY']._serialized_start=1040
+  _globals['_CLOSEREPLY']._serialized_end=1052
+  _globals['_GYMENV']._serialized_start=1054
+  _globals['_GYMENV']._serialized_end=1117
 # @@protoc_insertion_point(module_scope)

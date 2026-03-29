@@ -65,57 +65,63 @@ class Runner:
         last_metrics: dict[str, float] | None = None
         self._vision_frame_index = 0
         self._last_vision_detection = None
-        with LockonSession(server_addr=self.server_addr) as session:
-            frame_rgb = session.reset()
-            cv2.namedWindow("target-lock", cv2.WINDOW_NORMAL)
-            action = self.action_layout.build_idle()
-            step_indices = range(self.max_steps) if self.max_steps is not None else itertools.count()
+        self._reset_detector()
+        try:
+            with LockonSession(server_addr=self.server_addr) as session:
+                frame_rgb = session.reset()
+                cv2.namedWindow("target-lock", cv2.WINDOW_NORMAL)
+                action = self.action_layout.build_idle()
+                step_indices = range(self.max_steps) if self.max_steps is not None else itertools.count()
 
-            try:
-                for step_idx in step_indices:
-                    if self.action_mutator is not None:
-                        action = self.action_mutator(step_idx, action.copy())
+                try:
+                    for step_idx in step_indices:
+                        if self.action_mutator is not None:
+                            action = self.action_mutator(step_idx, action.copy())
 
-                    step_result = session.step(action)
-                    last_info = step_result.info
-                    frame_rgb = session.decode_frame(step_result.observation, last_info)
-                    last_info = self._resolve_tracking_info(last_info, frame_rgb)
-
-                    computed = self.controller.update(last_info, frame_rgb.shape, dt=CONTROL_DT)
-                    if self.action_mutator is None:
-                        action = self.action_layout.build_idle()
-                    else:
-                        action = self._clear_aim_action(action)
-
-                    last_metrics = None
-                    if computed is not None:
-                        aim_action, metrics = computed
-                        action[self.action_layout.yaw_index] = aim_action[self.action_layout.yaw_index]
-                        action[self.action_layout.pitch_index] = aim_action[self.action_layout.pitch_index]
-                        last_metrics = metrics.as_dict()
-
-                    should_fire = last_metrics is not None and self.fire_when_aligned and self._is_aligned(last_metrics)
-                    if should_fire and self.action_layout.fire_index is not None:
-                        fire_action = action.copy()
-                        fire_action[self.action_layout.fire_index] = 1.0
-                        fired = session.step(fire_action)
-                        last_info = fired.info
-                        frame_rgb = session.decode_frame(fired.observation, last_info)
+                        step_result = session.step(action)
+                        last_info = step_result.info
+                        frame_rgb = session.decode_frame(step_result.observation, last_info)
                         last_info = self._resolve_tracking_info(last_info, frame_rgb)
-                        fire_info = last_info.get("fire", {})
-                        if isinstance(fire_info, dict):
-                            print(f"[FIRE] {fire_info}")
 
-                    if step_idx % FRAME_SKIP == 0:
-                        display = self._build_display(frame_rgb, last_info, last_metrics)
-                        cv2.imshow("target-lock", display)
+                        computed = self.controller.update(last_info, frame_rgb.shape, dt=CONTROL_DT)
+                        if self.action_mutator is None:
+                            action = self.action_layout.build_idle()
+                        else:
+                            action = self._clear_aim_action(action)
+
+                        last_metrics = None
+                        if computed is not None:
+                            aim_action, metrics = computed
+                            action[self.action_layout.yaw_index] = aim_action[self.action_layout.yaw_index]
+                            action[self.action_layout.pitch_index] = aim_action[self.action_layout.pitch_index]
+                            last_metrics = metrics.as_dict()
+
+                        should_fire = last_metrics is not None and self.fire_when_aligned and self._is_aligned(last_metrics)
+                        if should_fire and self.action_layout.fire_index is not None:
+                            fire_action = action.copy()
+                            fire_action[self.action_layout.fire_index] = 1.0
+                            fired = session.step(fire_action)
+                            last_info = fired.info
+                            frame_rgb = session.decode_frame(fired.observation, last_info)
+                            last_info = self._resolve_tracking_info(last_info, frame_rgb)
+                            fire_info = last_info.get("fire", {})
+                            if isinstance(fire_info, dict):
+                                print(f"[FIRE] {fire_info}")
+
+                        if step_idx % FRAME_SKIP == 0:
+                            display = self._build_display(frame_rgb, last_info, last_metrics)
+                            cv2.imshow("target-lock", display)
+
                         key = cv2.waitKey(1)
+                        self._handle_action_mutator_key(key)
                         if (key & 0xFF) == 27:
                             break
 
-                    time.sleep(CONTROL_DT)
-            finally:
-                cv2.destroyAllWindows()
+                        time.sleep(CONTROL_DT)
+                finally:
+                    cv2.destroyAllWindows()
+        finally:
+            self._close_detector()
 
         return {"last_info": last_info, "last_metrics": last_metrics}
 
@@ -137,6 +143,14 @@ class Runner:
             action[self.action_layout.fire_index] = 0.0
         return action
 
+    def _handle_action_mutator_key(self, key: int) -> None:
+        mutator = self.action_mutator
+        if mutator is None:
+            return
+        handle_key = getattr(mutator, "handle_key", None)
+        if callable(handle_key):
+            handle_key(key)
+
     def _resolve_tracking_info(
         self,
         info: dict[str, object],
@@ -153,6 +167,7 @@ class Runner:
                 resolved.pop("bullseye_pixel", None)
                 resolved.pop("vision_bullseye_score", None)
                 resolved.pop("vision_bullseye_norm", None)
+                self._clear_vision_debug_info(resolved)
             return resolved
 
         if self.bullseye_source == BullseyeSource.VISION:
@@ -171,7 +186,14 @@ class Runner:
         self._vision_frame_index += 1
         if should_detect:
             detection = self._detect_bullseye(frame_rgb, info)
-            self._last_vision_detection = self._smooth_vision_detection(detection, info, frame_rgb.shape)
+            if self._uses_polled_detection():
+                self._last_vision_detection = detection
+            else:
+                self._last_vision_detection = self._smooth_vision_detection(detection, info, frame_rgb.shape)
+            return self._last_vision_detection
+        has_latest_detection, detection = self._get_latest_bullseye_detection()
+        if has_latest_detection:
+            self._last_vision_detection = detection
         return self._last_vision_detection
 
     def _smooth_vision_detection(
@@ -217,6 +239,35 @@ class Runner:
             return detect(frame_rgb, info=info)
         return detect(frame_rgb)
 
+    def _get_latest_bullseye_detection(self) -> tuple[bool, BullseyeDetection | None]:
+        detector = self.bullseye_detector
+        if detector is None:
+            return False, None
+        get_latest_detection = getattr(detector, "get_latest_detection", None)
+        if not callable(get_latest_detection):
+            return False, None
+        return True, get_latest_detection()
+
+    def _uses_polled_detection(self) -> bool:
+        has_latest_detection, _ = self._get_latest_bullseye_detection()
+        return has_latest_detection
+
+    def _reset_detector(self) -> None:
+        detector = self.bullseye_detector
+        if detector is None:
+            return
+        reset = getattr(detector, "reset", None)
+        if callable(reset):
+            reset()
+
+    def _close_detector(self) -> None:
+        detector = self.bullseye_detector
+        if detector is None:
+            return
+        close = getattr(detector, "close", None)
+        if callable(close):
+            close()
+
     def _apply_oracle_detection(
         self,
         info: dict[str, object],
@@ -224,6 +275,7 @@ class Runner:
     ) -> dict[str, object]:
         resolved = dict(info)
         resolved["bullseye_source"] = BullseyeSource.ORACLE.value
+        self._clear_vision_debug_info(resolved)
         resolved.pop("vision_bullseye_score", None)
         resolved.pop("vision_bullseye_norm", None)
         if detection is None:
@@ -238,6 +290,7 @@ class Runner:
     ) -> dict[str, object]:
         resolved = dict(info)
         resolved["bullseye_source"] = BullseyeSource.VISION.value
+        self._apply_vision_debug_info(resolved)
         resolved.pop("bullseye_pixel", None)
         resolved.pop("vision_bullseye_score", None)
         resolved.pop("vision_bullseye_norm", None)
@@ -248,6 +301,40 @@ class Runner:
         resolved["vision_bullseye_score"] = detection.score
         resolved["vision_bullseye_norm"] = [detection.x_norm, detection.y_norm]
         return resolved
+
+    def _apply_vision_debug_info(self, resolved: dict[str, object]) -> None:
+        detector = self.bullseye_detector
+        if detector is None:
+            self._clear_vision_debug_info(resolved)
+            return
+        get_debug_state = getattr(detector, "get_debug_state", None)
+        if not callable(get_debug_state):
+            self._clear_vision_debug_info(resolved)
+            return
+        debug_state = get_debug_state()
+        if not isinstance(debug_state, dict):
+            self._clear_vision_debug_info(resolved)
+            return
+        for key in (
+            "vision_input_frame_id",
+            "vision_input_sync_id",
+            "vision_detection_frame_id",
+            "vision_detection_sync_id",
+            "vision_detection_status",
+        ):
+            value = debug_state.get(key)
+            if value is None:
+                resolved.pop(key, None)
+            else:
+                resolved[key] = value
+
+    @staticmethod
+    def _clear_vision_debug_info(resolved: dict[str, object]) -> None:
+        resolved.pop("vision_input_frame_id", None)
+        resolved.pop("vision_input_sync_id", None)
+        resolved.pop("vision_detection_frame_id", None)
+        resolved.pop("vision_detection_sync_id", None)
+        resolved.pop("vision_detection_status", None)
 
     def _build_display(
         self,
@@ -297,6 +384,21 @@ class Runner:
         vision_score = info.get("vision_bullseye_score")
         if isinstance(vision_score, (float, int)):
             lines.append(f"vision_score={float(vision_score):.3f}")
+        input_frame_id = info.get("vision_input_frame_id")
+        input_sync_id = info.get("vision_input_sync_id")
+        if isinstance(input_frame_id, int) or isinstance(input_sync_id, int):
+            lines.append(f"vision_input frame={input_frame_id} sync={input_sync_id}")
+        detection_frame_id = info.get("vision_detection_frame_id")
+        detection_sync_id = info.get("vision_detection_sync_id")
+        detection_status = info.get("vision_detection_status")
+        if (
+            isinstance(detection_frame_id, int)
+            or isinstance(detection_sync_id, int)
+            or isinstance(detection_status, str)
+        ):
+            lines.append(
+                f"vision_det frame={detection_frame_id} sync={detection_sync_id} status={detection_status}"
+            )
         if metrics is not None:
             lines.extend(f"{key}={value:.3f}" for key, value in metrics.items())
         qpos = info.get("qpos")

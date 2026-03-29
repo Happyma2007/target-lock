@@ -54,6 +54,8 @@ controller:
     feedback_limit: 0.65
 
 motion:
+  # 是否启用手动底座控制；开启后使用 WASD 平移、Q/E 旋转，而不是随机运动
+  manual_base_control: false
   # 平面移动速度上限
   move_speed: 0.16
   # 底盘旋转扰动幅度上限
@@ -64,13 +66,19 @@ motion:
   seed: 0
 
 vision:
-  # YOLO onnx 模型路径，默认读取环境变量 TARGET_LOCK_ONNX_PATH
-  onnx_path: ${oc.env:TARGET_LOCK_ONNX_PATH,null}
-  # 模型输入尺寸无法直接推断时使用的回退值
-  img_size_fallback: 640
+  # 视觉引擎 gRPC 服务地址
+  engine_addr: ${oc.env:TARGET_LOCK_VISION_ENGINE_ADDR,127.0.0.1:50052}
+  # 发送给检测服务的图像格式，默认使用 H.264 编码帧
+  image_format: h264
   # 低于该分数的检测结果会被忽略
   score_threshold: 0.0
+  # 单次请求最多保留多少个检测结果；当前会选分数最高的点
+  max_detections: 1
+  # WebRTC 建链阶段的控制请求超时，null 表示不设超时
+  request_timeout_s: null
+  # WebRTC 检测本身已经异步返回，这个开关当前不再单独生效
+  async_inference: false
   # 视觉检测抽样倍率；1 表示每帧检测，n 表示每 n 帧检测一次并复用上次结果
-  detect_every_n_frames: 4
+  detect_every_n_frames: 1
   # 视觉检测指数平滑系数；1 表示不平滑，越小越平滑
-  smoothing_alpha: 0.8
+  smoothing_alpha: 1
